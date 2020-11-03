@@ -15,6 +15,9 @@ import reactor.core.publisher.Mono;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.concurrent.CountDownLatch;
 
 @SpringBootApplication
 public class SpringBootReactorApplication implements CommandLineRunner {
@@ -39,18 +42,90 @@ public class SpringBootReactorApplication implements CommandLineRunner {
 //        ExampleCommentWithZipMode2();
 //        ExampleWithRange();
 //        intervalExample();
-        intervalExample2();
+//        intervalExample2();
+//        intervalInfiniteExample();
+        intervalInfiniteFromCreate();
+    }
+
+
+    public void intervalInfiniteFromCreate() {
+
+        Flux.create(emitter -> {
+            Timer timer = new Timer();
+            timer.schedule(new TimerTask() {
+                private Integer contador = 0;
+
+                @Override
+                public void run() {
+                    emitter.next(++contador);
+                    if (contador == 10) {  // finalice with count
+                        timer.cancel();
+                        emitter.complete();
+                    }
+                    if (contador == 5) {   // finalice with error
+                        emitter.error(new InterruptedException("Error, process stop in flux 5"));
+                    }
+                }
+            }, 1000, 1000);
+        })
+//                .doOnNext(o -> log.info(o.toString()))            // estos dos elementos los pasamos al subscribe
+//                .doOnComplete(() -> log.info("Process complete"))
+//                .subscribe();
+                .subscribe(o -> log.info(o.toString()),
+                        error -> log.error(error.getMessage()),
+                        () -> log.info("Process complete"));
+
+
+    }
+
+
+    public void intervalInfiniteExample() throws InterruptedException {
+        CountDownLatch latch = new CountDownLatch(1);
+
+        // first mode
+        Flux.interval(Duration.ofSeconds(1))
+                .doOnTerminate(latch::countDown)
+                .flatMap(i -> {
+                    if (i >= 5) {
+                        return Flux.error(new InterruptedException("Solo hasta el 5"));
+                    }
+                    return Flux.just(i);
+                })
+                .map(i -> "Hola " + i)
+//                .doOnNext(log::info) // se quita pra no imprimir dos veces ya que el subcribe lo hace
+                .retry(2)  // reintenta ejecuciones las veces indicadas cuando hay un error
+                .subscribe(log::info, e -> log.error(e.getMessage()));
+
+        latch.await();
+
+        // second mode
+//        Flux.interval(Duration.ofSeconds(1))
+//                .doOnTerminate(() -> latch.countDown())
+//                .flatMap(i -> {
+//                    if (i >= 5) {
+//                        return Flux.error(new InterruptedException("Solo hasta el 5"));
+//                    }
+//                    return Flux.just(i);
+//                })
+//                .map(i -> "Hola " + i)
+//                .doOnNext(s -> log.info(s))
+//                .retry(2)
+//                .subscribe(s -> log.info(s), e -> log.error(e.getMessage()));
+//
+//        latch.await();
+
     }
 
 
     public void intervalExample2() throws InterruptedException {
-        Flux<Integer> rango = Flux.range(1, 12).delayElements(Duration.ofSeconds(1))
+        Flux<Integer> rango = Flux.range(1, 12)
+                .delayElements(Duration.ofSeconds(1))
                 .doOnNext(i -> log.info(i.toString()));
 
         rango.subscribe();   // se ejecuta en segundo plano
 //        rango.blockLast();   // hace que bloquee hasta que termine y es mejor
 
-//        Thread.sleep(13000);
+//        Thread.sleep(13000);  // hace una pausa en el hilo en ms
 
     }
 
