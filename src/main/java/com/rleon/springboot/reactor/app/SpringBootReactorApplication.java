@@ -4,6 +4,7 @@ import com.rleon.springboot.reactor.app.models.Comments;
 import com.rleon.springboot.reactor.app.models.UserComment;
 import com.rleon.springboot.reactor.app.models.Usuario;
 import org.reactivestreams.Subscriber;
+import org.reactivestreams.Subscription;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
@@ -44,7 +45,46 @@ public class SpringBootReactorApplication implements CommandLineRunner {
 //        intervalExample();
 //        intervalExample2();
 //        intervalInfiniteExample();
-        intervalInfiniteFromCreate();
+//        intervalInfiniteFromCreate();
+        contraPresion();
+    }
+
+
+    public void contraPresion() {
+        Flux.range(1, 10)
+                .log()
+                .subscribe(new Subscriber<>() {
+
+                    private Subscription s;
+                    private Integer limit = 5;
+                    private Integer consumed = 0;
+
+                    @Override
+                    public void onSubscribe(Subscription s) {
+                        this.s = s;
+                        s.request(limit);
+                    }
+
+                    @Override
+                    public void onNext(Integer t) {
+                        log.info(t.toString());
+                        consumed++;
+                        if (consumed.equals(limit)) {
+                            consumed = 0;
+                            s.request(limit);
+                        }
+                    }
+
+                    @Override
+                    public void onError(Throwable t) {
+
+                    }
+
+                    @Override
+                    public void onComplete() {
+
+                    }
+                });
     }
 
 
@@ -74,8 +114,6 @@ public class SpringBootReactorApplication implements CommandLineRunner {
                 .subscribe(o -> log.info(o.toString()),
                         error -> log.error(error.getMessage()),
                         () -> log.info("Process complete"));
-
-
     }
 
 
